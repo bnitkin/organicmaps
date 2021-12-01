@@ -28,7 +28,7 @@ omim_link_libraries(
   opening_hours
   pugixml
   icu
-  ${Qt5Core_LIBRARIES}
+  Qt5::Core
   ${Qt5Network_LIBRARIES}
   ${LIBZ}
 )

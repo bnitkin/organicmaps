@@ -1,7 +1,6 @@
 project(base)
 
-set(
-  SRC
+set(SRC
   array_adapters.hpp
   assert.hpp
   atomic_shared_ptr.hpp
