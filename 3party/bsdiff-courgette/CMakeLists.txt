@@ -13,8 +13,4 @@ set(SRC
 
 add_library(${PROJECT_NAME} ${SRC})
 
-# add_clang_compile_options("-Wno-shorten-64-to-32")
-
-# include_directories(bsdiff divsufsort)
-
 omim_add_test_subdirectory(bsdiff/bsdiff_tests)

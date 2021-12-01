@@ -146,11 +146,15 @@ if (APPLE)
   target_compile_options(${PROJECT_NAME} PRIVATE "-fobjc-arc")
 endif()
 
+if (PLATFORM_LINUX)
+  set_target_properties(${PROJECT_NAME} PROPERTIES AUTOMOC ON)
+endif()
+
 target_link_libraries(${PROJECT_NAME}
   geometry  # mercator::YToLat
   coding
   $<$<BOOL:${PLATFORM_DESKTOP}>:Qt5::Core>
-  $<$<BOOL:${PLATFORM_LINUX}>:${Qt5Network_LIBRARIES}>
+  $<$<BOOL:${PLATFORM_LINUX}>:Qt5::Network>
   $<$<BOOL:${PLATFORM_MAC}>:-framework\ Foundation -framework\ SystemConfiguration -framework\ CoreLocation -framework\ CFNetwork>
 )
 

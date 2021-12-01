@@ -156,58 +156,6 @@ function(append VAR)
   set(${VAR} ${${VAR}} ${ARGN} PARENT_SCOPE)
 endfunction()
 
-function(link_qt5_core target)
-  omim_link_libraries(
-    ${target}
-    Qt5::Core
-  )
-
-  if (PLATFORM_MAC)
-    omim_link_libraries(
-      ${target}
-      "-framework IOKit"
-    )
-  endif()
-endfunction()
-
-function(link_qt5_network target)
-  omim_link_libraries(
-    ${target}
-    ${Qt5Network_LIBRARIES}
-  )
-endfunction()
-
-function(link_qt5_webengine target)
-  omim_link_libraries(
-    ${target}
-    ${Qt5WebEngineWidgets_LIBRARIES}
-  )
-endfunction()
-
-function(add_clang_compile_options)
-  if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    add_compile_options(${ARGV})
-  endif()
-endfunction()
-
-function(add_gcc_compile_options)
-  if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-    add_compile_options(${ARGV})
-  endif()
-endfunction()
-
-function(add_clang_cpp_compile_options)
-  if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:${ARGV}>")
-  endif()
-endfunction()
-
-function(add_gcc_cpp_compile_options)
-  if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:${ARGV}>")
-  endif()
-endfunction()
-
 function(export_directory_flags filename)
   get_directory_property(include_directories INCLUDE_DIRECTORIES)
   get_directory_property(definitions COMPILE_DEFINITIONS)
