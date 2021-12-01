@@ -72,6 +72,8 @@ set(SRC
 
 omim_add_library(${PROJECT_NAME} SHARED ${SRC})
 
+target_include_directories(${PROJECT_NAME} PRIVATE .)
+
 target_link_libraries(${PROJECT_NAME}
   # Organic Maps libs
   map
@@ -120,4 +122,4 @@ target_link_libraries(${PROJECT_NAME}
   z
 )
 
-target_link_options(${PROJECT_NAME} PRIVATE "-fuse-ld=gold")
+#target_link_options(${PROJECT_NAME} PRIVATE "-fuse-ld=gold")

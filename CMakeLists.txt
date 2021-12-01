@@ -154,7 +154,7 @@ if (NOT (DEFINED ENV{CCACHE_DISABLE}))
   endif()
 endif()
 
-if (PLATFORM_LINUX)
+if (PLATFORM_LINUX OR PLATFORM_ANDROID)
   find_program(GOLD_FOUND ld.gold)
   if (GOLD_FOUND)
     message(STATUS "Using ld.gold")

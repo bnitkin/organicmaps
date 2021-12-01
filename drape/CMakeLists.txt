@@ -159,6 +159,10 @@ omim_add_library(${PROJECT_NAME} ${SRC})
 # Do not include glm's CMakeLists.txt, because it's outdated and not necessary.
 target_include_directories(${PROJECT_NAME} PUBLIC ${OMIM_ROOT}/3party/glm)
 
+if (PLATFORM_LINUX)
+  find_package(OpenGL)
+endif()
+
 target_link_libraries(${PROJECT_NAME}
   platform
   geometry
