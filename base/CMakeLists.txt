@@ -101,4 +101,8 @@ set(SRC
 
 omim_add_library(${PROJECT_NAME} ${SRC})
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+target_link_libraries(${PROJECT_NAME} INTERFACE Threads::Threads)
+
 omim_add_test_subdirectory(base_tests)
