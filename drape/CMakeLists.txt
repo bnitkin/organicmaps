@@ -164,6 +164,7 @@ if (PLATFORM_LINUX)
 endif()
 
 target_link_libraries(${PROJECT_NAME}
+  indexer
   platform
   geometry
   coding
