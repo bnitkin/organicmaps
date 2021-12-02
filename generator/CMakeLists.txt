@@ -250,6 +250,7 @@ target_link_libraries(${PROJECT_NAME}
   jansson
   expat
   tess2
+  $<$<BOOL:CMAKE_DL_LIBS>:${CMAKE_DL_LIBS}>  # dladdr from boost::stacktrace
 )
 
 omim_add_test_subdirectory(generator_tests_support)
