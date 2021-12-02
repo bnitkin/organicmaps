@@ -14,6 +14,7 @@ set(SRC
 omim_add_library(${PROJECT_NAME} ${SRC})
 
 target_link_libraries(${PROJECT_NAME}
+  search_tests_support  # TestSearchEngine in helpers.cpp
   search
   indexer
 )

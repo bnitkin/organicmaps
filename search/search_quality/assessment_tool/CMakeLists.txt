@@ -34,9 +34,8 @@ omim_add_executable(${PROJECT_NAME} ${SRC})
 set_target_properties(${PROJECT_NAME} PROPERTIES AUTOMOC ON)
 
 target_link_libraries(${PROJECT_NAME}
-  search_tests_support
-  qt_common
   search_quality
+  qt_common
   map
   gflags::gflags
 )
