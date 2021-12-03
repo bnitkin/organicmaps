@@ -171,64 +171,57 @@ NameScores GetNameScores(std::vector<strings::UniString> const & tokens, uint8_t
   if (slice.Empty())
     return {};
 
-  size_t const n = tokens.size();
-  size_t const m = slice.Size();
+  // Slice is the user query. Token is the potential match.
+  size_t const tokenCount = tokens.size();
+  size_t const sliceCount = slice.Size();
 
-  bool const lastTokenIsPrefix = slice.IsPrefix(m - 1);
+  bool const lastTokenIsPrefix = slice.IsPrefix(sliceCount - 1);
+
+  // Try matching words between token and slice, iterating over offsets.
+  // We want to try all offsets from -tokenCount to +tokenCount, but
+  // size_t is unsigned. So offset runs 0...2*tokenCount instead.
 
   NameScores scores;
-  for (size_t offset = 0; offset + m <= n; ++offset)
+  for (size_t offset = 0; offset < 2*tokenCount; ++offset)
   {
-    ErrorsMade totalErrorsMade;
+    // Reset error and match-length count for each offset attempt.
+    ErrorsMade totalErrorsMade(0);
     size_t matchedLength = 0;
-    bool match = true;
-    for (size_t i = 0; i < m - 1 && match; ++i)
+    // Iterate through the entire slice. Incomplete matches can still be good.
+    // TODO: Improve this to only interate levgal values. If that's not a huge pain.
+    for (size_t i = 0; i < sliceCount; ++i)
     {
-      auto errorsMade = impl::GetErrorsMade(slice.Get(i), tokens[offset + i]);
-      match = match && errorsMade.IsValid();
-      totalErrorsMade += errorsMade;
-      // The match length is preserved only if match is true below
-      matchedLength += slice.Get(i).GetOriginal().size();
+      size_t tokenIndex = offset - tokenCount + i;
+      if (offset + i < tokenCount || tokenCount <= tokenIndex)
+      {
+        continue; // Out of bounds.
+      }
+      // Count the errors. If GetErrorsMade finds a match, count it towards
+      // the matched length and check against the prior best.
+      auto errorsMade = impl::GetErrorsMade(slice.Get(i), tokens[tokenIndex]);
+      if (errorsMade.IsValid())
+      {
+        totalErrorsMade += errorsMade;
+        matchedLength += slice.Get(i).GetOriginal().size();
+        auto const isAltOrOldName =
+            lang == StringUtf8Multilang::kAltNameCode || lang == StringUtf8Multilang::kOldNameCode;
+
+        // Track the best match found across all offsets.
+        if (offset == 0)
+        {
+          scores.UpdateIfBetter(
+                      NameScores(NAME_SCORE_PREFIX, totalErrorsMade, isAltOrOldName, matchedLength));
+        }
+        else
+        {
+          scores.UpdateIfBetter(
+                  NameScores(NAME_SCORE_SUBSTRING, totalErrorsMade, isAltOrOldName, matchedLength));
+        }
+      }
+      LOG(LDEBUG, ("BJN Matching", slice.Get(i).GetOriginal(), "to result", tokens[tokenIndex], ": Valid?", errorsMade.IsValid(), totalErrorsMade));
     }
-
-    if (!match)
-      continue;
-
-    auto const prefixErrorsMade =
-        lastTokenIsPrefix ? impl::GetPrefixErrorsMade(slice.Get(m - 1), tokens[offset + m - 1])
-                          : ErrorsMade{};
-    auto const fullErrorsMade = impl::GetErrorsMade(slice.Get(m - 1), tokens[offset + m - 1]);
-    if (!fullErrorsMade.IsValid() && !(prefixErrorsMade.IsValid() && lastTokenIsPrefix))
-      continue;
-
-    // If error count is valid, then the match length should increase
-    matchedLength += slice.Get(m-1).GetOriginal().size();
-
-    LOG(LDEBUG, ("BJN Match length", matchedLength, "from", tokens, "into", slice));
-
-    auto const isAltOrOldName =
-        lang == StringUtf8Multilang::kAltNameCode || lang == StringUtf8Multilang::kOldNameCode;
-    if (m == n && fullErrorsMade.IsValid())
-    {
-      scores.m_nameScore = NAME_SCORE_FULL_MATCH;
-      scores.m_errorsMade = totalErrorsMade + fullErrorsMade;
-      scores.m_isAltOrOldName = isAltOrOldName;
-      scores.m_matchedLength = matchedLength;
-      return scores;
-    }
-
-    auto const newErrors =
-        lastTokenIsPrefix ? ErrorsMade::Min(fullErrorsMade, prefixErrorsMade) : fullErrorsMade;
-
-    if (offset == 0)
-    {
-      scores.UpdateIfBetter(
-          NameScores(NAME_SCORE_PREFIX, totalErrorsMade + newErrors, isAltOrOldName, matchedLength));
-    }
-
-    scores.UpdateIfBetter(
-        NameScores(NAME_SCORE_SUBSTRING, totalErrorsMade + newErrors, isAltOrOldName, matchedLength));
   }
+  LOG(LDEBUG, ("BJN Match length", scores.m_matchedLength, "/", scores.m_errorsMade, "from", tokens, "into", slice));
   return scores;
 }
 

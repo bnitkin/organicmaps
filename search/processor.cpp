@@ -307,7 +307,12 @@ void Processor::SetQuery(string const & query)
   else
   {
     // Assign the last parsed token to prefix.
-    if (!m_tokens.empty() && !delims(strings::LastUniChar(query)))
+    // BJN: Why is this? Prefixes don't have synonym handling, so the 'st' in "S Quince St" never matches.
+    // And why don't we use a prefix if there are too many tokens?
+    // I think prefixes are for street street number type matches?
+    // Temporarily disabled prefix handling.
+    // Leaving m_prefix empty here makes InitParams use the non-prefixing matcher.
+    if (false && !m_tokens.empty() && !delims(strings::LastUniChar(query)))
     {
       m_prefix.swap(m_tokens.back());
       m_tokens.pop_back();

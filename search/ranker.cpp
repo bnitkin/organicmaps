@@ -189,8 +189,6 @@ void MatchTokenRange(FeatureType & ft, Geocoder::Params const & params, TokenRan
   // This is getting set to 0 all the time. Unclear why.
   matchedLength = scores.m_matchedLength;
   LOG(LDEBUG, ("BJN final matched length:", matchedLength));
-  // BJN Delete
-  //matchedLength = 5;
   if (errorsMade.IsValid())
     return;
   // BJN: This chunk was duplicate since GetNameScores computes errors and match length.
@@ -469,7 +467,7 @@ private:
       auto errorsMade = scores.m_errorsMade;
       bool isAltOrOldName = scores.m_isAltOrOldName;
       auto matchedLength = scores.m_matchedLength;
-      LOG(LDEBUG, ("BJN score:", matchedLength));
+      LOG(LDEBUG, ("BJN score:", matchedLength, "for", ft.DebugString(8), preInfo));
 
       if (info.m_type != Model::TYPE_STREET &&
           preInfo.m_geoParts.m_street != IntersectionResult::kInvalidId)
@@ -886,7 +884,8 @@ void Ranker::MatchForSuggestions(strings::UniString const & token, int8_t locale
 
 void Ranker::ProcessSuggestions(vector<RankerResult> & vec) const
 {
-  if (m_params.m_prefix.empty() || !m_params.m_suggestsEnabled)
+  // Suggestions with no prefix are fine by me...
+  if (/*m_params.m_prefix.empty() ||*/ !m_params.m_suggestsEnabled)
     return;
 
   size_t added = 0;
@@ -908,8 +907,10 @@ void Ranker::ProcessSuggestions(vector<RankerResult> & vec) const
           ++added;
         }
 
-        i = vec.erase(i);
-        continue;
+        // It's okay to list something as a suggestion (to speed typing)
+        // and a result (to jump there)
+        //i = vec.erase(i);
+        //continue;
       }
     }
     ++i;

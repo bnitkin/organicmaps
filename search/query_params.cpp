@@ -130,15 +130,33 @@ void QueryParams::RemoveToken(size_t i)
 
 void QueryParams::AddSynonyms()
 {
+  // BJN Note: this doesn't look up synonyms for prefix tokens
+  // What are prefix tokens, anyway?
   for (auto & token : m_tokens)
   {
     string const ss = ToUtf8(MakeLowerCase(token.GetOriginal()));
     auto const it = kSynonyms.find(ss);
+    LOG(LDEBUG, ("Searching for synonyms for ", ss));
     if (it == kSynonyms.end())
       continue;
 
     for (auto const & synonym : it->second)
       token.AddSynonym(synonym);
+  }
+  // Get synonyms for the prefix token.
+  // BJN: I'm not clear what role the prefix serves, but I'm going to leave it alone.
+  if (!m_prefixToken.GetOriginal().empty())
+  {
+    string const ss = ToUtf8(MakeLowerCase(m_prefixToken.GetOriginal()));
+    auto const it = kSynonyms.find(ss);
+    LOG(LDEBUG, ("Prefix: Searching for synonyms for ", ss));
+    if (it != kSynonyms.end())
+    {
+      for (auto const & synonym : it->second)
+      {
+        m_prefixToken.AddSynonym(synonym);
+      }
+    }
   }
 }
 
