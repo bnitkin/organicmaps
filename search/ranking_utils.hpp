@@ -118,25 +118,31 @@ enum NameScore
 struct NameScores
 {
   NameScores() = default;
-  NameScores(NameScore nameScore, ErrorsMade const & errorsMade, bool isAltOrOldName)
-    : m_nameScore(nameScore), m_errorsMade(errorsMade), m_isAltOrOldName(isAltOrOldName)
+  NameScores(NameScore nameScore, ErrorsMade const & errorsMade, bool isAltOrOldName, size_t matchedLength)
+    : m_nameScore(nameScore), m_errorsMade(errorsMade), m_isAltOrOldName(isAltOrOldName), m_matchedLength(matchedLength)
   {
   }
 
   void UpdateIfBetter(NameScores const & rhs)
   {
-    auto const newNameScoreIsBetter = rhs.m_nameScore > m_nameScore;
-    auto const nameScoresAreEqual = rhs.m_nameScore == m_nameScore;
+    auto const newNameScoreIsBetter = m_nameScore < rhs.m_nameScore;
+    auto const nameScoresAreEqual = m_nameScore == rhs.m_nameScore;
     auto const newLanguageIsBetter = m_isAltOrOldName && !rhs.m_isAltOrOldName;
     auto const languagesAreEqual = m_isAltOrOldName == rhs.m_isAltOrOldName;
-    if (newNameScoreIsBetter || (nameScoresAreEqual && newLanguageIsBetter))
+    auto const newMatchedLengthIsBetter = m_matchedLength < rhs.m_matchedLength;
+    auto const matchedLengthAreEqual = m_matchedLength == rhs.m_matchedLength;
+
+    if (newNameScoreIsBetter ||
+       (nameScoresAreEqual && newMatchedLengthIsBetter) ||
+       (nameScoresAreEqual && matchedLengthAreEqual && newLanguageIsBetter))
     {
       m_nameScore = rhs.m_nameScore;
       m_errorsMade = rhs.m_errorsMade;
       m_isAltOrOldName = rhs.m_isAltOrOldName;
+      m_matchedLength = rhs.m_matchedLength;
       return;
     }
-    if (nameScoresAreEqual && languagesAreEqual)
+    if (nameScoresAreEqual && matchedLengthAreEqual && languagesAreEqual)
       m_errorsMade = ErrorsMade::Min(m_errorsMade, rhs.m_errorsMade);
   }
 
@@ -149,6 +155,7 @@ struct NameScores
   NameScore m_nameScore = NAME_SCORE_ZERO;
   ErrorsMade m_errorsMade;
   bool m_isAltOrOldName = false;
+  size_t m_matchedLength = 0;
 };
 
 // Returns true when |s| is a stop-word and may be removed from a query.
@@ -173,12 +180,15 @@ NameScores GetNameScores(std::vector<strings::UniString> const & tokens, uint8_t
   for (size_t offset = 0; offset + m <= n; ++offset)
   {
     ErrorsMade totalErrorsMade;
+    size_t matchedLength = 0;
     bool match = true;
     for (size_t i = 0; i < m - 1 && match; ++i)
     {
       auto errorsMade = impl::GetErrorsMade(slice.Get(i), tokens[offset + i]);
       match = match && errorsMade.IsValid();
       totalErrorsMade += errorsMade;
+      // The match length is preserved only if match is true below
+      matchedLength += slice.Get(i).GetOriginal().size();
     }
 
     if (!match)
@@ -191,6 +201,11 @@ NameScores GetNameScores(std::vector<strings::UniString> const & tokens, uint8_t
     if (!fullErrorsMade.IsValid() && !(prefixErrorsMade.IsValid() && lastTokenIsPrefix))
       continue;
 
+    // If error count is valid, then the match length should increase
+    matchedLength += slice.Get(m-1).GetOriginal().size();
+
+    LOG(LDEBUG, ("BJN Match length", matchedLength, "from", tokens, "into", slice));
+
     auto const isAltOrOldName =
         lang == StringUtf8Multilang::kAltNameCode || lang == StringUtf8Multilang::kOldNameCode;
     if (m == n && fullErrorsMade.IsValid())
@@ -198,6 +213,7 @@ NameScores GetNameScores(std::vector<strings::UniString> const & tokens, uint8_t
       scores.m_nameScore = NAME_SCORE_FULL_MATCH;
       scores.m_errorsMade = totalErrorsMade + fullErrorsMade;
       scores.m_isAltOrOldName = isAltOrOldName;
+      scores.m_matchedLength = matchedLength;
       return scores;
     }
 
@@ -207,11 +223,11 @@ NameScores GetNameScores(std::vector<strings::UniString> const & tokens, uint8_t
     if (offset == 0)
     {
       scores.UpdateIfBetter(
-          NameScores(NAME_SCORE_PREFIX, totalErrorsMade + newErrors, isAltOrOldName));
+          NameScores(NAME_SCORE_PREFIX, totalErrorsMade + newErrors, isAltOrOldName, matchedLength));
     }
 
     scores.UpdateIfBetter(
-        NameScores(NAME_SCORE_SUBSTRING, totalErrorsMade + newErrors, isAltOrOldName));
+        NameScores(NAME_SCORE_SUBSTRING, totalErrorsMade + newErrors, isAltOrOldName, matchedLength));
   }
   return scores;
 }

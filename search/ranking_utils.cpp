@@ -139,7 +139,7 @@ string DebugPrint(NameScore score)
 string DebugPrint(NameScores scores)
 {
   ostringstream os;
-  os << "[ " << DebugPrint(scores.m_nameScore) << ", " << DebugPrint(scores.m_errorsMade) << ", "
+  os << "[ " << DebugPrint(scores.m_nameScore) << ", " << scores.m_matchedLength << ", " << DebugPrint(scores.m_errorsMade) << ", "
      << scores.m_isAltOrOldName << " ]";
   return os.str();
 }

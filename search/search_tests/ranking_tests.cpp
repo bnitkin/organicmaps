@@ -54,6 +54,8 @@ UNIT_TEST(NameTest_Smoke)
         (name, query, tokenRange));
   };
 
+  // BJN Update these with some s/south tests and more POI tests.
+  // I think buffing the FULL_MATCH bonus plus fixing the s/south thing will help a lot.
   test("New York", "Central Park, New York, US", TokenRange(2, 4), NAME_SCORE_FULL_MATCH, 0);
   test("New York", "York", TokenRange(0, 1), NAME_SCORE_SUBSTRING, 0);
   test("Moscow", "Red Square Mosc", TokenRange(2, 3), NAME_SCORE_PREFIX, 0);

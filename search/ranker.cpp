@@ -96,20 +96,15 @@ vector<vector<strings::UniString>> ModifyStrasse(vector<strings::UniString> cons
   return result;
 }
 
-pair<NameScores, size_t> GetNameScores(FeatureType & ft, Geocoder::Params const & params,
+NameScores GetNameScores(FeatureType & ft, Geocoder::Params const & params,
                                        TokenRange const & range, Model::Type type)
 {
   NameScores bestScores;
 
+  LOG(LDEBUG, ("Hello from GetNameScores", range, type));
+
   TokenSlice const slice(params, range);
   TokenSliceNoCategories const sliceNoCategories(params, range);
-
-  size_t matchedLength = 0;
-  if (type != Model::Type::TYPE_COUNT)
-  {
-    for (size_t i = 0; i < slice.Size(); ++i)
-      matchedLength += slice.Get(i).GetOriginal().size();
-  }
 
   for (auto const lang : params.GetLangs())
   {
@@ -131,7 +126,9 @@ pair<NameScores, size_t> GetNameScores(FeatureType & ft, Geocoder::Params const 
 
     for (auto const & t : tokens)
     {
+      LOG(LDEBUG, ("Update #1", DebugPrint(bestScores), bestScores.m_matchedLength));
       UpdateNameScores(t, lang, slice, bestScores);
+      LOG(LDEBUG, ("Update #2", DebugPrint(bestScores), bestScores.m_matchedLength));
       UpdateNameScores(t, lang, sliceNoCategories, bestScores);
 
       if (type == Model::TYPE_STREET)
@@ -139,7 +136,9 @@ pair<NameScores, size_t> GetNameScores(FeatureType & ft, Geocoder::Params const 
         auto const variants = ModifyStrasse(t);
         for (auto const & variant : variants)
         {
+          LOG(LDEBUG, ("Update #3", DebugPrint(bestScores), bestScores.m_matchedLength));
           UpdateNameScores(variant, lang, slice, bestScores);
+          LOG(LDEBUG, ("Update #4", DebugPrint(bestScores), bestScores.m_matchedLength));
           UpdateNameScores(variant, lang, sliceNoCategories, bestScores);
         }
       }
@@ -176,7 +175,8 @@ pair<NameScores, size_t> GetNameScores(FeatureType & ft, Geocoder::Params const 
       UpdateNameScores(shield, StringUtf8Multilang::kDefaultCode, sliceNoCategories, bestScores);
   }
 
-  return make_pair(bestScores, matchedLength);
+  LOG(LDEBUG, ("Update Final", DebugPrint(bestScores)));
+  return bestScores;
 }
 
 void MatchTokenRange(FeatureType & ft, Geocoder::Params const & params, TokenRange const & range,
@@ -184,17 +184,16 @@ void MatchTokenRange(FeatureType & ft, Geocoder::Params const & params, TokenRan
                      bool & isAltOrOldName)
 {
   auto const scores = GetNameScores(ft, params, range, type);
-  errorsMade = scores.first.m_errorsMade;
-  isAltOrOldName = scores.first.m_isAltOrOldName;
-  matchedLength = scores.second;
+  errorsMade = scores.m_errorsMade;
+  isAltOrOldName = scores.m_isAltOrOldName;
+  // This is getting set to 0 all the time. Unclear why.
+  matchedLength = scores.m_matchedLength;
+  LOG(LDEBUG, ("BJN final matched length:", matchedLength));
+  // BJN Delete
+  //matchedLength = 5;
   if (errorsMade.IsValid())
     return;
-
-  for (auto const token : range)
-  {
-    errorsMade += ErrorsMade{GetMaxErrorsForToken(params.GetToken(token).GetOriginal())};
-    matchedLength += params.GetToken(token).GetOriginal().size();
-  }
+  // BJN: This chunk was duplicate since GetNameScores computes errors and match length.
 }
 
 void RemoveDuplicatingLinear(vector<RankerResult> & results)
@@ -466,10 +465,11 @@ private:
     {
       auto const scores = GetNameScores(ft, m_params, preInfo.InnermostTokenRange(), info.m_type);
 
-      auto nameScore = scores.first.m_nameScore;
-      auto errorsMade = scores.first.m_errorsMade;
-      bool isAltOrOldName = scores.first.m_isAltOrOldName;
-      auto matchedLength = scores.second;
+      auto nameScore = scores.m_nameScore;
+      auto errorsMade = scores.m_errorsMade;
+      bool isAltOrOldName = scores.m_isAltOrOldName;
+      auto matchedLength = scores.m_matchedLength;
+      LOG(LDEBUG, ("BJN score:", matchedLength));
 
       if (info.m_type != Model::TYPE_STREET &&
           preInfo.m_geoParts.m_street != IntersectionResult::kInvalidId)
@@ -482,11 +482,12 @@ private:
           auto const & range = preInfo.m_tokenRanges[type];
           auto const streetScores = GetNameScores(*street, m_params, range, type);
 
-          nameScore = min(nameScore, streetScores.first.m_nameScore);
-          errorsMade += streetScores.first.m_errorsMade;
-          if (streetScores.first.m_isAltOrOldName)
+          nameScore = min(nameScore, streetScores.m_nameScore);
+          errorsMade += streetScores.m_errorsMade;
+          if (streetScores.m_isAltOrOldName)
             isAltOrOldName = true;
-          matchedLength += streetScores.second;
+          matchedLength += streetScores.m_matchedLength;
+          LOG(LDEBUG, ("BJN street:", matchedLength));
         }
       }
 
@@ -506,6 +507,7 @@ private:
                           suburbNameIsAltNameOrOldName);
           errorsMade += suburbErrors;
           matchedLength += suburbMatchedLength;
+          LOG(LDEBUG, ("BJN suburb:", matchedLength));
           if (suburbNameIsAltNameOrOldName)
             isAltOrOldName = true;
         }
@@ -540,6 +542,8 @@ private:
       info.m_matchedFraction =
           totalLength == 0 ? 1.0
                            : static_cast<double>(matchedLength) / static_cast<double>(totalLength);
+
+      LOG(LDEBUG, ("BJN", info.m_matchedFraction, "is", matchedLength, "of", totalLength));
 
       auto const isCountryOrCapital = [](FeatureType & ft) {
         auto static const countryType = classif().GetTypeByPath({"place", "country"});
@@ -722,8 +726,10 @@ void Ranker::UpdateResults(bool lastUpdate)
     // *NOTE* GetLinearModelRank is calculated on the fly
     // but the model is lightweight enough and the slowdown
     // is negligible.
+
     sort(m_tentativeResults.rbegin(), m_tentativeResults.rend(),
          base::LessBy(&RankerResult::GetLinearModelRank));
+
     ProcessSuggestions(m_tentativeResults);
   }
 

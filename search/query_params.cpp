@@ -16,6 +16,7 @@ namespace search
 namespace
 {
 // All synonyms should be lowercase.
+// BJN: Think through other synonyms.
 map<string, vector<string>> const kSynonyms = {
     {"n",    {"north"}},
     {"w",    {"west"}},
@@ -26,6 +27,10 @@ map<string, vector<string>> const kSynonyms = {
     {"sw",   {"southwest"}},
     {"se",   {"southeast"}},
     {"st",   {"saint", "street"}},
+    {"blvd", {"boulevard"}},
+    {"cir",  {"circle"}},
+    {"ct",   {"court"}},
+    {"rt",   {"route"}},
     {"св",   {"святой", "святого", "святая", "святые", "святых", "свято"}},
     {"б",    {"большая", "большой"}},
     {"бол",  {"большая", "большой"}},

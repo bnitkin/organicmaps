@@ -33,6 +33,7 @@ double constexpr kRank = 0.1065355;
 double constexpr kPopularity = 1.0000000;
 double constexpr kFalseCats = -0.4172461;
 double constexpr kErrorsMade = -0.0391331;
+// These coefficients might need tweaking. Unclear right now.
 double constexpr kMatchedFraction = 0.1876736;
 double constexpr kAllTokensUsed = 0.0478513;
 double constexpr kExactCountryOrCapital = 0.1247733;
