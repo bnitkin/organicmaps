@@ -158,6 +158,9 @@ struct NameScores
   size_t m_matchedLength = 0;
 };
 
+std::string DebugPrint(NameScore score);
+std::string DebugPrint(NameScores scores);
+
 // Returns true when |s| is a stop-word and may be removed from a query.
 bool IsStopWord(strings::UniString const & s);
 
@@ -169,59 +172,119 @@ NameScores GetNameScores(std::vector<strings::UniString> const & tokens, uint8_t
                          Slice const & slice)
 {
   if (slice.Empty())
+  {
     return {};
+  }
 
   // Slice is the user query. Token is the potential match.
   size_t const tokenCount = tokens.size();
   size_t const sliceCount = slice.Size();
 
-  bool const lastTokenIsPrefix = slice.IsPrefix(sliceCount - 1);
-
   // Try matching words between token and slice, iterating over offsets.
-  // We want to try all offsets from -tokenCount to +tokenCount, but
-  // size_t is unsigned. So offset runs 0...2*tokenCount instead.
-
+  // We want to try all possible offsets of the slice and token lists
+  // When offset = 0, the last token in tokens is compared to the first in slice.
+  // When offset = sliceCount + tokenCount, the last token
+  // in slice is compared to the first in tokens.
+  //                              0   1   2   3   4   5   6
+  // slice count=7:              foo bar baz bot bop bip bla
+  // token count=3:      bar baz bot
+  LOG(LDEBUG, ("BJN sliceCount", sliceCount, "tokenCount", tokenCount));
   NameScores scores;
-  for (size_t offset = 0; offset < 2*tokenCount; ++offset)
+  // Feature names and queries aren't necessarily index-aligned, so it's important
+  // to "slide" the feature name along the query to look for matches.
+  // For instance,
+  // "Pennsylvania Ave NW, Washington, DC"
+  // "1600 Pennsylvania Ave"
+  // doesn't match at all, but 
+  //      "Pennsylvania Ave NW, Washington, DC"
+  // "1600 Pennsylvania Ave"
+  // is a partial match. Fuzzy matching helps match buildings
+  // missing addresses in OSM, and it helps be more flexible in general.
+  for (size_t offset = 0; offset < sliceCount + tokenCount; ++offset)
   {
     // Reset error and match-length count for each offset attempt.
     ErrorsMade totalErrorsMade(0);
     size_t matchedLength = 0;
+    bool fullMatch = true;
+    // Prefix matches are require slice & token be lined up.
+    bool prefixMatch = 0 == (tokenCount - 1) - offset;
+    bool isAltOrOldName = false;
     // Iterate through the entire slice. Incomplete matches can still be good.
-    // TODO: Improve this to only interate levgal values. If that's not a huge pain.
+    // When offset = 0, tokenIndex should start at +2:
+    //                 0   1   2   3   4   5   6
+    //slice =         foo bar baz bot bop bip bla
+    //token = baz bot bop
+    //         0   1   2
+    //Offset must run to 8 to test all potential matches. (slice + token - 1)
+    //Making tokenIndex start at -6 (-sliceSize)
+    //                 0   1   2   3   4   5   6
+    //slice =         foo bar baz bot bop bip bla
+    //token =                                 baz bot bop
+    //                -6  -5  -4  -3  -2  -1   0   1   2
     for (size_t i = 0; i < sliceCount; ++i)
     {
-      size_t tokenIndex = offset - tokenCount + i;
-      if (offset + i < tokenCount || tokenCount <= tokenIndex)
+      size_t tokenIndex = i + (tokenCount - 1) - offset;
+      // Ensure that tokenIndex is within bounds.
+      if (tokenIndex < 0 || tokenCount <= tokenIndex)
       {
-        continue; // Out of bounds.
+        continue;
       }
+      LOG(LDEBUG, ("BJN comparing", offset, i, tokenIndex, slice.Get(i), "to", tokens[tokenIndex]));
       // Count the errors. If GetErrorsMade finds a match, count it towards
       // the matched length and check against the prior best.
       auto errorsMade = impl::GetErrorsMade(slice.Get(i), tokens[tokenIndex]);
+
+      // If GetErrorsMade fails to match, check whether the start of the query matches.
+      // That's a common case if the user's in the middle of typing.
+      if (!errorsMade.IsValid() &&
+            StartsWith(tokens[tokenIndex], slice.Get(i).GetOriginal()))
+      {
+        // If the prefix matches, the error count is the size difference.
+        errorsMade = ErrorsMade(0);
+        //base::Abs(tokens[tokenIndex].size() - slice.Get(i).GetOriginal().size()));
+        // Disable fullMatch when using the prefix rule.
+        fullMatch = false;
+      }
       if (errorsMade.IsValid())
       {
+        // Update the match quality
         totalErrorsMade += errorsMade;
         matchedLength += slice.Get(i).GetOriginal().size();
-        auto const isAltOrOldName =
+        isAltOrOldName =
             lang == StringUtf8Multilang::kAltNameCode || lang == StringUtf8Multilang::kOldNameCode;
-
-        // Track the best match found across all offsets.
-        if (offset == 0)
-        {
-          scores.UpdateIfBetter(
-                      NameScores(NAME_SCORE_PREFIX, totalErrorsMade, isAltOrOldName, matchedLength));
-        }
-        else
-        {
-          scores.UpdateIfBetter(
-                  NameScores(NAME_SCORE_SUBSTRING, totalErrorsMade, isAltOrOldName, matchedLength));
-        }
       }
-      LOG(LDEBUG, ("BJN Matching", slice.Get(i).GetOriginal(), "to result", tokens[tokenIndex], ": Valid?", errorsMade.IsValid(), totalErrorsMade));
+      else
+      {
+        // If any token mismatches, this offset doesn't provide a full match.
+        fullMatch = false;
+        // If the first token is incorrect, this isn't a prefix match.
+        if (matchedLength == 0) prefixMatch = false;
+      }
     }
+
+    // Compute the match quality for this offset
+    enum NameScore nameScore = NAME_SCORE_ZERO;
+    if (matchedLength)
+    {
+      nameScore = NAME_SCORE_SUBSTRING;
+      // prefixMatch indicates at least one token had a prefix match but not a full match.
+      if (prefixMatch)
+      {
+        nameScore = NAME_SCORE_PREFIX;
+      }
+      if (fullMatch && (tokenCount == sliceCount))
+      {
+        LOG(LDEBUG, ("BJN full match"));
+        nameScore = NAME_SCORE_FULL_MATCH;
+      }
+    }
+    else
+    {
+      totalErrorsMade = ErrorsMade();
+    }
+    scores.UpdateIfBetter(NameScores(nameScore, totalErrorsMade, isAltOrOldName, matchedLength));
   }
-  LOG(LDEBUG, ("BJN Match length", scores.m_matchedLength, "/", scores.m_errorsMade, "from", tokens, "into", slice));
+  LOG(LDEBUG, ("BJN Match quality", search::DebugPrint(scores), "from", tokens, "into", slice));
   return scores;
 }
 
@@ -233,7 +296,4 @@ NameScores GetNameScores(std::string const & name, uint8_t lang, Slice const & s
                  Delimiters());
   return GetNameScores(tokens, lang, slice);
 }
-
-std::string DebugPrint(NameScore score);
-std::string DebugPrint(NameScores scores);
 }  // namespace search

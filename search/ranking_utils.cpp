@@ -139,8 +139,8 @@ string DebugPrint(NameScore score)
 string DebugPrint(NameScores scores)
 {
   ostringstream os;
-  os << "[ " << DebugPrint(scores.m_nameScore) << ", " << scores.m_matchedLength << ", " << DebugPrint(scores.m_errorsMade) << ", "
-     << scores.m_isAltOrOldName << " ]";
+  os << "[ " << DebugPrint(scores.m_nameScore) << ", Length:" << scores.m_matchedLength << ", " << DebugPrint(scores.m_errorsMade) << ", "
+     << (scores.m_isAltOrOldName ? "Old name" : "New name") << " ]";
   return os.str();
 }
 }  // namespace search
