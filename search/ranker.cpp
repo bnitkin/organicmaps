@@ -101,8 +101,6 @@ NameScores GetNameScores(FeatureType & ft, Geocoder::Params const & params,
 {
   NameScores bestScores;
 
-  LOG(LDEBUG, ("Hello from ranker GetNameScores", range, type, ft.DebugString(8)));
-
   TokenSlice const slice(params, range);
   TokenSliceNoCategories const sliceNoCategories(params, range);
 
@@ -127,9 +125,7 @@ NameScores GetNameScores(FeatureType & ft, Geocoder::Params const & params,
     for (auto const & t : tokens)
     {
       UpdateNameScores(t, lang, slice, bestScores);
-      LOG(LDEBUG, ("Update #1", DebugPrint(bestScores), bestScores.m_matchedLength));
       UpdateNameScores(t, lang, sliceNoCategories, bestScores);
-      LOG(LDEBUG, ("Update #2", DebugPrint(bestScores), bestScores.m_matchedLength));
 
       if (type == Model::TYPE_STREET)
       {
@@ -146,20 +142,17 @@ NameScores GetNameScores(FeatureType & ft, Geocoder::Params const & params,
   if (type == Model::TYPE_BUILDING)
     UpdateNameScores(ft.GetHouseNumber(), StringUtf8Multilang::kDefaultCode, sliceNoCategories,
                      bestScores);
-          LOG(LDEBUG, ("Update Building", DebugPrint(bestScores), bestScores.m_matchedLength));
 
   if (ftypes::IsAirportChecker::Instance()(ft))
   {
     string const iata = ft.GetMetadata(feature::Metadata::FMD_AIRPORT_IATA);
     if (!iata.empty())
       UpdateNameScores(iata, StringUtf8Multilang::kDefaultCode, sliceNoCategories, bestScores);
-          LOG(LDEBUG, ("Update Airport", DebugPrint(bestScores), bestScores.m_matchedLength));
   }
 
   string const op = ft.GetMetadata(feature::Metadata::FMD_OPERATOR);
   if (!op.empty())
     UpdateNameScores(op, StringUtf8Multilang::kDefaultCode, sliceNoCategories, bestScores);
-          LOG(LDEBUG, ("Update Operator", DebugPrint(bestScores), bestScores.m_matchedLength));
 
   string const brand = ft.GetMetadata(feature::Metadata::FMD_BRAND);
   if (!brand.empty())
@@ -167,7 +160,6 @@ NameScores GetNameScores(FeatureType & ft, Geocoder::Params const & params,
     auto const & brands = indexer::GetDefaultBrands();
     brands.ForEachNameByKey(brand, [&](indexer::BrandsHolder::Brand::Name const & name) {
       UpdateNameScores(name.m_name, name.m_locale, sliceNoCategories, bestScores);
-      LOG(LDEBUG, ("Update Brand", DebugPrint(bestScores), bestScores.m_matchedLength));
     });
   }
 
@@ -177,7 +169,6 @@ NameScores GetNameScores(FeatureType & ft, Geocoder::Params const & params,
       UpdateNameScores(shield, StringUtf8Multilang::kDefaultCode, sliceNoCategories, bestScores);
   }
 
-  LOG(LDEBUG, ("Goodbye    ranker GetNameScores", DebugPrint(bestScores), ft.DebugString(8)));
   return bestScores;
 }
 
@@ -188,12 +179,9 @@ void MatchTokenRange(FeatureType & ft, Geocoder::Params const & params, TokenRan
   auto const scores = GetNameScores(ft, params, range, type);
   errorsMade = scores.m_errorsMade;
   isAltOrOldName = scores.m_isAltOrOldName;
-  // This is getting set to 0 all the time. Unclear why.
   matchedLength = scores.m_matchedLength;
-  LOG(LDEBUG, ("BJN final matched length:", matchedLength));
   if (errorsMade.IsValid())
     return;
-  // BJN: This chunk was duplicate since GetNameScores computes errors and match length.
 }
 
 void RemoveDuplicatingLinear(vector<RankerResult> & results)
@@ -469,7 +457,6 @@ private:
       auto errorsMade = scores.m_errorsMade;
       bool isAltOrOldName = scores.m_isAltOrOldName;
       auto matchedLength = scores.m_matchedLength;
-      LOG(LDEBUG, ("BJN score:", matchedLength, "for", ft.DebugString(8), preInfo));
 
       if (info.m_type != Model::TYPE_STREET &&
           preInfo.m_geoParts.m_street != IntersectionResult::kInvalidId)
@@ -487,7 +474,6 @@ private:
           if (streetScores.m_isAltOrOldName)
             isAltOrOldName = true;
           matchedLength += streetScores.m_matchedLength;
-          LOG(LDEBUG, ("BJN street:", matchedLength));
         }
       }
 
@@ -507,7 +493,6 @@ private:
                           suburbNameIsAltNameOrOldName);
           errorsMade += suburbErrors;
           matchedLength += suburbMatchedLength;
-          LOG(LDEBUG, ("BJN suburb:", matchedLength));
           if (suburbNameIsAltNameOrOldName)
             isAltOrOldName = true;
         }
@@ -542,8 +527,6 @@ private:
       info.m_matchedFraction =
           totalLength == 0 ? 1.0
                            : static_cast<double>(matchedLength) / static_cast<double>(totalLength);
-
-      LOG(LDEBUG, ("BJN", info.m_matchedFraction, "is", matchedLength, "of", totalLength));
 
       auto const isCountryOrCapital = [](FeatureType & ft) {
         auto static const countryType = classif().GetTypeByPath({"place", "country"});
@@ -886,8 +869,7 @@ void Ranker::MatchForSuggestions(strings::UniString const & token, int8_t locale
 
 void Ranker::ProcessSuggestions(vector<RankerResult> & vec) const
 {
-  // Suggestions with no prefix are fine by me...
-  if (/*m_params.m_prefix.empty() ||*/ !m_params.m_suggestsEnabled)
+  if (!m_params.m_suggestsEnabled)
     return;
 
   size_t added = 0;
@@ -908,11 +890,6 @@ void Ranker::ProcessSuggestions(vector<RankerResult> & vec) const
         {
           ++added;
         }
-
-        // It's okay to list something as a suggestion (to speed typing)
-        // and a result (to jump there)
-        //i = vec.erase(i);
-        //continue;
       }
     }
     ++i;

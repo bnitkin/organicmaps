@@ -176,6 +176,7 @@ NameScores GetNameScores(std::vector<strings::UniString> const & tokens, uint8_t
     return {};
   }
 
+  NameScores scores;
   // Slice is the user query. Token is the potential match.
   size_t const tokenCount = tokens.size();
   size_t const sliceCount = slice.Size();
@@ -185,17 +186,12 @@ NameScores GetNameScores(std::vector<strings::UniString> const & tokens, uint8_t
   // When offset = 0, the last token in tokens is compared to the first in slice.
   // When offset = sliceCount + tokenCount, the last token
   // in slice is compared to the first in tokens.
-  //                              0   1   2   3   4   5   6
-  // slice count=7:              foo bar baz bot bop bip bla
-  // token count=3:      bar baz bot
-  LOG(LDEBUG, ("BJN sliceCount", sliceCount, "tokenCount", tokenCount));
-  NameScores scores;
   // Feature names and queries aren't necessarily index-aligned, so it's important
   // to "slide" the feature name along the query to look for matches.
   // For instance,
   // "Pennsylvania Ave NW, Washington, DC"
   // "1600 Pennsylvania Ave"
-  // doesn't match at all, but 
+  // doesn't match at all, but
   //      "Pennsylvania Ave NW, Washington, DC"
   // "1600 Pennsylvania Ave"
   // is a partial match. Fuzzy matching helps match buildings
@@ -210,11 +206,17 @@ NameScores GetNameScores(std::vector<strings::UniString> const & tokens, uint8_t
     bool prefixMatch = 0 == (tokenCount - 1) - offset;
     bool isAltOrOldName = false;
     // Iterate through the entire slice. Incomplete matches can still be good.
+    // Using this slice & token as an example:
+    //                              0   1   2   3   4   5   6
+    // slice count=7:              foo bar baz bot bop bip bla
+    // token count=3:      bar baz bot
+    //
     // When offset = 0, tokenIndex should start at +2:
     //                 0   1   2   3   4   5   6
     //slice =         foo bar baz bot bop bip bla
     //token = baz bot bop
     //         0   1   2
+    //
     //Offset must run to 8 to test all potential matches. (slice + token - 1)
     //Making tokenIndex start at -6 (-sliceSize)
     //                 0   1   2   3   4   5   6
@@ -229,7 +231,6 @@ NameScores GetNameScores(std::vector<strings::UniString> const & tokens, uint8_t
       {
         continue;
       }
-      LOG(LDEBUG, ("BJN comparing", offset, i, tokenIndex, slice.Get(i), "to", tokens[tokenIndex]));
       // Count the errors. If GetErrorsMade finds a match, count it towards
       // the matched length and check against the prior best.
       auto errorsMade = impl::GetErrorsMade(slice.Get(i), tokens[tokenIndex]);
@@ -274,7 +275,6 @@ NameScores GetNameScores(std::vector<strings::UniString> const & tokens, uint8_t
       }
       if (fullMatch && (tokenCount == sliceCount))
       {
-        LOG(LDEBUG, ("BJN full match"));
         nameScore = NAME_SCORE_FULL_MATCH;
       }
     }
@@ -284,7 +284,8 @@ NameScores GetNameScores(std::vector<strings::UniString> const & tokens, uint8_t
     }
     scores.UpdateIfBetter(NameScores(nameScore, totalErrorsMade, isAltOrOldName, matchedLength));
   }
-  LOG(LDEBUG, ("BJN Match quality", search::DebugPrint(scores), "from", tokens, "into", slice));
+  // Uncomment for verbose search logging
+  //LOG(LDEBUG, ("Match quality", search::DebugPrint(scores), "from", tokens, "into", slice));
   return scores;
 }
 

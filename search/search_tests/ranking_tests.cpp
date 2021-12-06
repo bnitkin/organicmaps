@@ -30,16 +30,7 @@ NameScores GetScore(string const & name, string const & query, TokenRange const 
   vector<UniString> tokens;
   SplitUniString(NormalizeAndSimplifyString(query), base::MakeBackInsertFunctor(tokens), delims);
 
-  // BJN: Try not prefixing.
-  if (false && !query.empty() && !delims(strings::LastUniChar(query)))
-  {
-    CHECK(!tokens.empty(), ());
-    params.InitWithPrefix(tokens.begin(), tokens.end() - 1, tokens.back());
-  }
-  else
-  {
-    params.InitNoPrefix(tokens.begin(), tokens.end());
-  }
+  params.InitNoPrefix(tokens.begin(), tokens.end());
 
   return GetNameScores(name, StringUtf8Multilang::kDefaultCode, TokenSlice(params, tokenRange));
 }
@@ -56,7 +47,6 @@ UNIT_TEST(NameTest_Smoke)
   };
 
   base::ScopedLogLevelChanger const enableDebug(LDEBUG);
-  // BJN Update these with some s/south tests and more POI tests.
   //    name,      query,                        range,            expected score,   errors, match length
   test("New York", "Central Park, New York, US", TokenRange(2, 4), NAME_SCORE_FULL_MATCH, 0, 7);
   test("New York", "York", TokenRange(0, 1), NAME_SCORE_SUBSTRING, 0, 4);
@@ -65,10 +55,8 @@ UNIT_TEST(NameTest_Smoke)
   test("Moscow", "Red Square Moscow", TokenRange(2, 3), NAME_SCORE_FULL_MATCH, 0, 6);
   test("Moscow", "Red Square Moscw", TokenRange(2, 3), NAME_SCORE_FULL_MATCH, 1, 5);
   test("San Francisco", "Fran", TokenRange(0, 1), NAME_SCORE_SUBSTRING, 0, 4);
-  // These don't work since the tokenizing engine strips trailing spaces.
-  //test("San Francisco", "Fran ", TokenRange(0, 1), NAME_SCORE_ZERO, 0, 0);
   test("San Francisco", "Sa", TokenRange(0, 1), NAME_SCORE_PREFIX, 0, 2);
-  //test("San Francisco", "San ", TokenRange(0, 1), NAME_SCORE_PREFIX, 0, 3);
+  test("San Francisco", "San ", TokenRange(0, 1), NAME_SCORE_PREFIX, 0, 3);
   test("South Fredrick Street", "S Fredrick St", TokenRange(0, 3), NAME_SCORE_FULL_MATCH, 0, 11);
   test("South Fredrick Street", "S Fredrick", TokenRange(0, 2), NAME_SCORE_PREFIX, 0, 9);
   test("South Fredrick Street", "Fredrick St", TokenRange(0, 2), NAME_SCORE_SUBSTRING, 0, 10);
