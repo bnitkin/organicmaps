@@ -149,7 +149,7 @@ struct NameScores
   bool operator==(NameScores const & rhs)
   {
     return m_nameScore == rhs.m_nameScore && m_errorsMade == rhs.m_errorsMade &&
-           m_isAltOrOldName == rhs.m_isAltOrOldName;
+           m_isAltOrOldName == rhs.m_isAltOrOldName && m_matchedLength == rhs.m_matchedLength;
   }
 
   NameScore m_nameScore = NAME_SCORE_ZERO;
@@ -239,10 +239,10 @@ NameScores GetNameScores(std::vector<strings::UniString> const & tokens, uint8_t
       if (!errorsMade.IsValid() &&
             StartsWith(tokens[tokenIndex], slice.Get(i).GetOriginal()))
       {
-        // If the prefix matches, the error count is the size difference.
+        // If the prefix matches, pretend there weren't any errors.
         errorsMade = ErrorsMade(0);
-        //base::Abs(tokens[tokenIndex].size() - slice.Get(i).GetOriginal().size()));
         // Disable fullMatch when using the prefix rule.
+        // That provides a suitable search penalty.
         fullMatch = false;
       }
       if (errorsMade.IsValid())
