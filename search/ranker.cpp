@@ -709,10 +709,8 @@ void Ranker::UpdateResults(bool lastUpdate)
     // *NOTE* GetLinearModelRank is calculated on the fly
     // but the model is lightweight enough and the slowdown
     // is negligible.
-
     sort(m_tentativeResults.rbegin(), m_tentativeResults.rend(),
          base::LessBy(&RankerResult::GetLinearModelRank));
-
     ProcessSuggestions(m_tentativeResults);
   }
 
