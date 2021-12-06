@@ -546,7 +546,6 @@ private:
                                      info.m_nameScore == NAME_SCORE_FULL_MATCH &&
                                      isCountryOrCapital(ft);
     }
-
     CategoriesInfo const categoriesInfo(feature::TypesHolder(ft),
                                         TokenSlice(m_params, preInfo.InnermostTokenRange()),
                                         m_ranker.m_params.m_categoryLocales, m_ranker.m_categories);
@@ -680,6 +679,7 @@ Result Ranker::MakeResult(RankerResult const & rankerResult, bool needAddress,
 
 void Ranker::SuggestStrings()
 {
+  // Prefix is only empty when tokens exceeds the max allowed. No point in giving suggestions then.
   if (m_params.m_prefix.empty() || !m_params.m_suggestsEnabled)
     return;
 
@@ -867,7 +867,7 @@ void Ranker::MatchForSuggestions(strings::UniString const & token, int8_t locale
 
 void Ranker::ProcessSuggestions(vector<RankerResult> & vec) const
 {
-  if (!m_params.m_suggestsEnabled)
+  if (m_params.m_prefix.empty() || !m_params.m_suggestsEnabled)
     return;
 
   size_t added = 0;

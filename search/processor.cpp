@@ -304,6 +304,15 @@ void Processor::SetQuery(string const & query)
   {
     m_tokens.resize(maxTokensCount);
   }
+  else
+  {
+    // Assign the last parsed token to prefix.
+    if (!m_tokens.empty() && !delims(strings::LastUniChar(query)))
+    {
+      m_prefix.swap(m_tokens.back());
+      m_tokens.pop_back();
+    }
+  }
 
   RemoveStopWordsIfNeeded(m_tokens, m_prefix);
 

@@ -30,7 +30,15 @@ NameScores GetScore(string const & name, string const & query, TokenRange const 
   vector<UniString> tokens;
   SplitUniString(NormalizeAndSimplifyString(query), base::MakeBackInsertFunctor(tokens), delims);
 
-  params.InitNoPrefix(tokens.begin(), tokens.end());
+  if (!query.empty() && !delims(strings::LastUniChar(query)))
+  {
+    CHECK(!tokens.empty(), ());
+    params.InitWithPrefix(tokens.begin(), tokens.end() - 1, tokens.back());
+  }
+  else
+  {
+    params.InitNoPrefix(tokens.begin(), tokens.end());
+  }
 
   return GetNameScores(name, StringUtf8Multilang::kDefaultCode, TokenSlice(params, tokenRange));
 }
@@ -54,19 +62,20 @@ UNIT_TEST(NameTest_Smoke)
   test("Moscow", "Red Square Mosc", TokenRange(2, 3), NAME_SCORE_PREFIX, 0, 4);
   test("Moscow", "Red Square Moscow", TokenRange(2, 3), NAME_SCORE_FULL_MATCH, 0, 6);
   test("Moscow", "Red Square Moscw", TokenRange(2, 3), NAME_SCORE_FULL_MATCH, 1, 5);
-  test("San Francisco", "Fran", TokenRange(0, 1), NAME_SCORE_SUBSTRING, 0, 4);
+  test("San Francisco", "Fran", TokenRange(0, 1), NAME_SCORE_PREFIX, 0, 4);
+  test("San Francisco", "Fran ", TokenRange(0, 1), NAME_SCORE_ZERO, 0, 0);
   test("San Francisco", "Sa", TokenRange(0, 1), NAME_SCORE_PREFIX, 0, 2);
-  test("San Francisco", "San ", TokenRange(0, 1), NAME_SCORE_PREFIX, 0, 3);
+  test("San Francisco", "San ", TokenRange(0, 1), NAME_SCORE_SUBSTRING, 0, 3);
   test("South Fredrick Street", "S Fredrick St", TokenRange(0, 3), NAME_SCORE_FULL_MATCH, 0, 11);
-  test("South Fredrick Street", "S Fredrick", TokenRange(0, 2), NAME_SCORE_PREFIX, 0, 9);
+  test("South Fredrick Street", "S Fredrick", TokenRange(0, 2), NAME_SCORE_SUBSTRING, 0, 9);
   test("South Fredrick Street", "Fredrick St", TokenRange(0, 2), NAME_SCORE_SUBSTRING, 0, 10);
   test("North Scott Boulevard", "N Scott Blvd", TokenRange(0, 3), NAME_SCORE_FULL_MATCH, 0, 10);
-  test("North Scott Boulevard", "N Scott", TokenRange(0, 2), NAME_SCORE_PREFIX, 0, 6);
+  test("North Scott Boulevard", "N Scott", TokenRange(0, 2), NAME_SCORE_SUBSTRING, 0, 6);
   test("Лермонтовъ", "Лермон", TokenRange(0, 1), NAME_SCORE_PREFIX, 0, 6);
   test("Лермонтовъ", "Лермонтов", TokenRange(0, 1), NAME_SCORE_FULL_MATCH, 1, 9);
   test("Лермонтовъ", "Лермонтово", TokenRange(0, 1), NAME_SCORE_FULL_MATCH, 1, 10);
   test("Лермонтовъ", "Лермнтовъ", TokenRange(0, 1), NAME_SCORE_FULL_MATCH, 1, 9);
-  test("фото на документы", "фото", TokenRange(0, 1), NAME_SCORE_PREFIX, 0, 4);
+  test("фото на документы", "фото", TokenRange(0, 1), NAME_SCORE_SUBSTRING, 0, 4);
   test("фотоателье", "фото", TokenRange(0, 1), NAME_SCORE_PREFIX, 0, 4);
 }
 

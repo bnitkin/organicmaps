@@ -130,11 +130,12 @@ struct NameScores
     auto const newLanguageIsBetter = m_isAltOrOldName && !rhs.m_isAltOrOldName;
     auto const languagesAreEqual = m_isAltOrOldName == rhs.m_isAltOrOldName;
     auto const newMatchedLengthIsBetter = m_matchedLength < rhs.m_matchedLength;
-    auto const matchedLengthAreEqual = m_matchedLength == rhs.m_matchedLength;
+    // It's okay to pick a slightly worse matched length if other scores are better.
+    auto const matchedLengthsAreSimilar = (m_matchedLength - m_matchedLength/4) <= rhs.m_matchedLength;
 
-    if (newNameScoreIsBetter ||
-       (nameScoresAreEqual && newMatchedLengthIsBetter) ||
-       (nameScoresAreEqual && matchedLengthAreEqual && newLanguageIsBetter))
+    if (newMatchedLengthIsBetter ||
+       (matchedLengthsAreSimilar && newNameScoreIsBetter) ||
+       (matchedLengthsAreSimilar && nameScoresAreEqual && newLanguageIsBetter))
     {
       m_nameScore = rhs.m_nameScore;
       m_errorsMade = rhs.m_errorsMade;
@@ -142,7 +143,7 @@ struct NameScores
       m_matchedLength = rhs.m_matchedLength;
       return;
     }
-    if (nameScoresAreEqual && matchedLengthAreEqual && languagesAreEqual)
+    if (matchedLengthsAreSimilar && nameScoresAreEqual && languagesAreEqual)
       m_errorsMade = ErrorsMade::Min(m_errorsMade, rhs.m_errorsMade);
   }
 
@@ -172,9 +173,7 @@ NameScores GetNameScores(std::vector<strings::UniString> const & tokens, uint8_t
                          Slice const & slice)
 {
   if (slice.Empty())
-  {
     return {};
-  }
 
   NameScores scores;
   // Slice is the user query. Token is the potential match.
@@ -201,9 +200,10 @@ NameScores GetNameScores(std::vector<strings::UniString> const & tokens, uint8_t
     // Reset error and match-length count for each offset attempt.
     ErrorsMade totalErrorsMade(0);
     size_t matchedLength = 0;
+    // fullMatch indicates every token matches between the query and returned name.
     bool fullMatch = true;
-    // Prefix matches are require slice & token be lined up.
-    bool prefixMatch = 0 == (tokenCount - 1) - offset;
+    // prefixMatch is a near-complete match, but the last search token had too many errors.
+    bool prefixMatch = false;
     bool isAltOrOldName = false;
     // Iterate through the entire slice. Incomplete matches can still be good.
     // Using this slice & token as an example:
@@ -235,16 +235,18 @@ NameScores GetNameScores(std::vector<strings::UniString> const & tokens, uint8_t
       // the matched length and check against the prior best.
       auto errorsMade = impl::GetErrorsMade(slice.Get(i), tokens[tokenIndex]);
 
-      // If GetErrorsMade fails to match, check whether the start of the query matches.
-      // That's a common case if the user's in the middle of typing.
-      if (!errorsMade.IsValid() &&
-            StartsWith(tokens[tokenIndex], slice.Get(i).GetOriginal()))
+      // If GetErrorsMade fails to match and this is the last token of the search,
+      // check whether the start of the token matches.
+      if (!errorsMade.IsValid() && fullMatch && slice.IsPrefix(i))
       {
-        // If the prefix matches, pretend there weren't any errors.
-        errorsMade = ErrorsMade(0);
-        // Disable fullMatch when using the prefix rule.
-        // That provides a suitable search penalty.
-        fullMatch = false;
+        errorsMade = impl::GetPrefixErrorsMade(slice.Get(i), tokens[tokenIndex]);
+        if (errorsMade.IsValid())
+        {
+          // Penalize by reducing nameScore, not by increasing error count.
+          fullMatch = false;
+          prefixMatch = true;
+          errorsMade = ErrorsMade(0);
+        }
       }
       if (errorsMade.IsValid())
       {
@@ -258,12 +260,10 @@ NameScores GetNameScores(std::vector<strings::UniString> const & tokens, uint8_t
       {
         // If any token mismatches, this offset doesn't provide a full match.
         fullMatch = false;
-        // If the first token is incorrect, this isn't a prefix match.
-        if (matchedLength == 0) prefixMatch = false;
       }
     }
 
-    // Compute the match quality for this offset
+    // Compute the name score for this offset
     enum NameScore nameScore = NAME_SCORE_ZERO;
     if (matchedLength)
     {

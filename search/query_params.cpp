@@ -133,12 +133,19 @@ void QueryParams::AddSynonyms()
   {
     string const ss = ToUtf8(MakeLowerCase(token.GetOriginal()));
     auto const it = kSynonyms.find(ss);
-    LOG(LDEBUG, ("Searching for synonyms for ", ss));
     if (it == kSynonyms.end())
       continue;
 
     for (auto const & synonym : it->second)
       token.AddSynonym(synonym);
+  }
+  if (m_hasPrefix)
+  {
+    string const ss = ToUtf8(MakeLowerCase(m_prefixToken.GetOriginal()));
+    auto const it = kSynonyms.find(ss);
+    if (it != kSynonyms.end())
+      for (auto const & synonym : it->second)
+        m_prefixToken.AddSynonym(synonym);
   }
 }
 
