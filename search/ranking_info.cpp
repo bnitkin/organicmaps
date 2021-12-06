@@ -38,10 +38,10 @@ double constexpr kAllTokensUsed = 0.0478513;
 double constexpr kExactCountryOrCapital = 0.1247733;
 double constexpr kRefusedByFilter = -1.0000000;
 double constexpr kNameScore[NameScore::NAME_SCORE_COUNT] = {
-  0.0085962 /* Zero */,
-  -0.0099698 /* Substring */,
-  -0.0158311 /* Prefix */,
-  0.0172047 /* Full Match */
+ -0.05  /* Zero */,
+  0.008 /* Substring */,
+  0.013 /* Prefix */,
+  0.017 /* Full Match */
 };
 double constexpr kType[Model::TYPE_COUNT] = {
   -0.0467816 /* SUBPOI */,
