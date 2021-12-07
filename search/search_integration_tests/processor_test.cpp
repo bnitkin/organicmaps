@@ -2510,7 +2510,7 @@ UNIT_CLASS_TEST(ProcessorTest, Suburbs)
   SetViewport(m2::RectD(-1.0, -1.0, 1.0, 1.0));
   {
     testFullMatch("Malet place 3, Bloomsbury ", ExactMatch(countryId, house));
-    // Since cafe is a POI type instead of a name, it doesn't currently contribute to matchedFraction.
+    // @todo Since cafe is a POI type instead of a name, it doesn't currently contribute to matchedFraction.
     // That results in failing TEST_ALMOST_EQUAL_ABS above. This would be good to fix.
     //testFullMatch("Bloomsbury cafe ", ExactMatch(countryId, cafe));
     testFullMatch("Bloomsbury ", ExactMatch(countryId, suburb));
