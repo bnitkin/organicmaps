@@ -24,6 +24,7 @@ struct FeaturesLayer
   std::vector<uint32_t> const * m_sortedFeatures;
 
   strings::UniString m_subQuery;
+  bool m_badSearchLength;
 
   TokenRange m_tokenRange;
   Model::Type m_type;

@@ -76,6 +76,34 @@ size_t constexpr kPostcodesRectsCacheSize = 10;
 size_t constexpr kSuburbsRectsCacheSize = 10;
 size_t constexpr kLocalityRectsCacheSize = 10;
 
+// Shortest subquery lengths to trigger a search, by token type
+// Subqueries include whitespace, as in "f st" or "joanne fabrics"
+// Single character searches like "S" almost never return useful results.
+size_t constexpr kMinLengthForSearch[BaseContext::TokenType::TOKEN_TYPE_COUNT] = {
+    // SUBPOI and COMPLEX_POIs are very common. Using a slightly higher
+    // min length provides higher certainty.
+    // i.e. "jo" isn't enough to confidently identify "joanne".
+    // "joa" is much better.
+  3, // TOKEN_TYPE_SUBPOI
+  3, // TOKEN_TYPE_COMPLEX_POI
+  2, // TOKEN_TYPE_BUILDING
+  2, // TOKEN_TYPE_STREET
+  // At least in the US, suburb name is rarely part of an address,
+  // and are often long enough to trigger false positives.
+  // i.e. "Grove Homes at Walnut Hills".
+  3, // TOKEN_TYPE_SUBURB
+  2, // TOKEN_TYPE_UNCLASSIFIED
+  2, // TOKEN_TYPE_VILLAGE
+  2, // TOKEN_TYPE_CITY
+  // States and countries are rare enough that a single character could be meaningful.
+  // i.e. "P" in "Philadelphia, P"
+  1, // TOKEN_TYPE_STATE
+  1, // TOKEN_TYPE_COUNTRY
+  2, // TOKEN_TYPE_POSTCODE
+};
+
+
+
 UniString const kUniSpace(MakeUniString(" "));
 
 struct ScopedMarkTokens
@@ -677,6 +705,7 @@ void Geocoder::InitLayer(Model::Type type, TokenRange const & tokenRange, Featur
   JoinQueryTokens(m_params, layer.m_tokenRange, kUniSpace /* sep */, layer.m_subQuery);
   layer.m_lastTokenIsPrefix =
       !layer.m_tokenRange.Empty() && m_params.IsPrefixToken(layer.m_tokenRange.End() - 1);
+  layer.m_badSearchLength = layer.m_subQuery.size() < kMinLengthForSearch[type];
 }
 
 void Geocoder::FillLocalityCandidates(BaseContext const & ctx, CBV const & filter,
@@ -1229,6 +1258,8 @@ void Geocoder::GreedilyMatchStreetsWithSuburbs(BaseContext & ctx,
 
       auto & layer = layers.back();
       InitLayer(Model::TYPE_SUBURB, suburb.m_tokenRange, layer);
+      if (layer.m_badSearchLength)
+        return;
       vector<uint32_t> suburbFeatures = {ft->GetID().m_index};
       layer.m_sortedFeatures = &suburbFeatures;
 
@@ -1268,6 +1299,8 @@ void Geocoder::CreateStreetsLayerAndMatchLowerLayers(BaseContext & ctx,
 
   auto & layer = layers.back();
   InitLayer(Model::TYPE_STREET, prediction.m_tokenRange, layer);
+  if (layer.m_badSearchLength)
+      return;
 
   vector<uint32_t> sortedFeatures;
   sortedFeatures.reserve(base::checked_cast<size_t>(prediction.m_features.PopCount()));
@@ -1359,6 +1392,8 @@ void Geocoder::MatchPOIsAndBuildings(BaseContext & ctx, size_t curToken, CBV con
 
     auto & layer = layers.back();
     InitLayer(Model::TYPE_BUILDING, m_postcodes.m_tokenRange, layer);
+    if (layer.m_badSearchLength)
+      return;
 
     vector<uint32_t> features;
     m_postcodes.m_countryFeatures.ForEach([&features](uint64_t bit) {
@@ -1409,6 +1444,8 @@ void Geocoder::MatchPOIsAndBuildings(BaseContext & ctx, size_t curToken, CBV con
     {
       auto & layer = layers.back();
       InitLayer(layer.m_type, TokenRange(curToken, curToken + n), layer);
+      if (layer.m_badSearchLength)
+          continue;
     }
 
     features = features.Intersect(ctx.m_features[curToken + n - 1]);
@@ -1547,7 +1584,8 @@ void Geocoder::FindPaths(BaseContext & ctx)
   vector<FeaturesLayer const *> sortedLayers;
   sortedLayers.reserve(layers.size());
   for (auto const & layer : layers)
-    sortedLayers.push_back(&layer);
+    if (layer.m_subQuery.size() > 1)
+      sortedLayers.push_back(&layer);
   sort(sortedLayers.begin(), sortedLayers.end(), base::LessBy(&FeaturesLayer::m_type));
 
   auto const & innermostLayer = *sortedLayers.front();

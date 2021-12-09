@@ -19,6 +19,7 @@ void FeaturesLayer::Clear()
   m_type = Model::TYPE_COUNT;
   m_hasDelayedFeatures = false;
   m_lastTokenIsPrefix = false;
+  m_badSearchLength = false;
 }
 
 string DebugPrint(FeaturesLayer const & layer)
